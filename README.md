@@ -1,0 +1,2 @@
+# astarAI
+An OpenTTD AI
