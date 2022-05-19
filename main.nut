@@ -1,5 +1,6 @@
 require("town.nut");
 require("route.nut");
+require("location.nut");
 
 class AstarAI extends AIController {
 
@@ -48,6 +49,7 @@ function AstarAI::Start() {
   } else {
     AILog.Info("station from can not built");
   }
+  SearchPossibleRoadBetweenLocations(route.locationFrom, route.locationTo);
   while (true) {
     AILog.Info("in loop.");
     this.Sleep(1000);
@@ -81,9 +83,9 @@ function AstarAI::GetClosestRoad(location) {
   local stopLocation = location;
   local xIndex = AIMap.GetTileX(location);
   local yIndex = AIMap.GetTileY(location);
-  local isRoadLocation = CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(xIndex, yIndex)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y));
   local x = xIndex;
   local y = yIndex;
+  local isRoadLocation = CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(xIndex, yIndex)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y));
   local i = 1;
   while (!isRoadLocation && i < 10) {
     for (local j=0; j < i; j++) {
@@ -161,8 +163,34 @@ function CanBuildDriveThroughRoadStation(location) {
   return false;
 }
 
-function searchPossibleRoadBetweenLocations(from, to) {
+function SearchPossibleRoadBetweenLocations(f, t) {
   local road = [];
+  local from = Location.get(f);
+  local to = Location.get(t);
+  local currentLocation = from;
+  local directionX = true;
+  local nextLocation;
+  AILog.Info(from);
+  AILog.Info(to);
+  while (!currentLocation.equals(to)) {
+    nextLocation = currentLocation.getNextTo(to, directionX);
+    AILog.Info(nextLocation);
+    if (AIRoad.IsRoadTile(nextLocation.id)) {
+      AILog.Info("is road");
+      road.append(nextLocation);
+      directionX = true;
+    } else if (AITile.IsBuildable(nextLocation.id)) {
+      AILog.Info("is buildable");
+      road.append(nextLocation);
+      directionX = true;
+    } else if (directionX) {
+      directionX = false;
+    } else {
+      AILog.Info("road can not build");
+      break;
+    } 
+    break;
+  }
 }
 
 /**
