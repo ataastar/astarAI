@@ -36,7 +36,7 @@ function AstarAI::Start() {
   }*/
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
-  local route = searchValuableRoadRoute();
+  local route = SearchValuableRoadRoute();
   AILog.Info("route from: " + route.locationFrom);
   AILog.Info("route to: " + route.locationTo);
 
@@ -51,7 +51,15 @@ function AstarAI::Start() {
   } else {
     AILog.Info("station from can not built");
   }
-  SearchPossibleRoadBetweenLocations(route.locationFrom, route.locationTo);
+  local roads = SearchPossibleRoadBetweenLocations(route.locationFrom, route.locationTo);
+  local prevRoad = null;
+  foreach (road in roads) {
+    if (prevRoad != null) {
+      AILog.Info(prevRoad);
+      AIRoad.BuildRoad(prevRoad.id, road.id);
+    }
+    prevRoad = road;
+  }
   while (true) {
     AILog.Info("in loop.");
     this.Sleep(1000);
@@ -165,6 +173,9 @@ function CanBuildDriveThroughRoadStation(location) {
   return false;
 }
 
+/**
+ * Start go in X direction always. Can not bypass anything. So not sure it can find possible road
+ */
 function SearchPossibleRoadBetweenLocations(f, t) {
   local road = [];
   local visitedLocations = {};
@@ -176,62 +187,67 @@ function SearchPossibleRoadBetweenLocations(f, t) {
   AILog.Info(from);
   AILog.Info(to);
   local i = 0;
-  while (!currentLocation.equals(to) && i < 466) {
+  while (!currentLocation.equals(to) && i < 1000) {
     i++;
-    AILog.Info(i);
+    //AILog.Info(i);
+    // get the next location by direction to the destination
     nextLocation = currentLocation.getNextTo(to, directionX);
-    AILog.Info("next: " + nextLocation);
+    //AILog.Info("next: " + nextLocation);
     if (visitedLocations.rawin(nextLocation.id)) {
-      AILog.Info("already visited: " + nextLocation);
-      if (!directionX) {
+      //AILog.Info("already visited: " + nextLocation);
+      if (!directionX) { // if we tries to get next by in Y direction and it is already visited, then remove the last/previous from the list, because we can not go forward
         local prevLocation = road.pop();
         visitedLocations.rawset(prevLocation.id, prevLocation.id);
-        AILog.Info(prevLocation);
+        //AILog.Info(prevLocation);
         currentLocation = prevLocation;
         directionX = true;
-      } else {
+      } else { // if it is visited then try to go Y direction
         directionX = false;
       }
       continue;
     }
     if (AIRoad.IsRoadTile(nextLocation.id)) {
-      AILog.Info("is road");
+      //AILog.Info("is road");
       road.append(nextLocation);
       directionX = nextLocation.x != to.x;
-      AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
+      //AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
       currentLocation = nextLocation;
     } else if (AITile.IsBuildable(nextLocation.id)) {
-      AILog.Info("is buildable");
+      //AILog.Info("is buildable");
       road.append(nextLocation);
       directionX = nextLocation.x != to.x;
-      AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
+      //AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
       currentLocation = nextLocation;
-      this.Sleep(5);
+      //this.Sleep(1);
     } else if (directionX) {
       directionX = false;
-      AILog.Info("direction changed");
+      //AILog.Info("direction changed");
     } else {
-      AILog.Info("road can not build");
+      //AILog.Info("road can not build");
       local prevLocation = road.pop();
-      AILog.Info(prevLocation);
+      //AILog.Info(prevLocation);
+      // we can not go forward, we go back to the previous x-1 location and sign al of the skipped location as "visited"
       visitedLocations.rawset(prevLocation.id, prevLocation.id);
-      if (to.x == nextLocation.x) {
-        while (nextLocation.x == prevLocation.x) {
-          prevLocation = road.pop();
+      while (nextLocation.x == prevLocation.x) {
+        prevLocation = road.pop();
+        if (nextLocation.x == prevLocation.x) {
           visitedLocations.rawset(prevLocation.id, prevLocation.id);
-          AILog.Info(prevLocation);
+        } else { // no need remove the last one (because it is in other X coordination)
+          road.append(prevLocation);
         }
+        //AILog.Info(prevLocation);
       }
       currentLocation = prevLocation;
     } 
   }
+  return road;
 }
 
 
 /**
  * Searches a valuable route for buses. not too far not too close
  */
-function AstarAI::searchValuableRoadRoute() {
+function AstarAI::SearchValuableRoadRoute() {
   local townList = getTowns();
   /*townList.sort(
     function(a,b) { 
