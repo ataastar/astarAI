@@ -12,11 +12,11 @@ function AstarAI::Start() {
   AILog.Info(AICompany.GetBankBalance(AICompany.COMPANY_SELF));
   ChooseCompanyName();
   AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
-  AILog.Info("Company name is set");
+  /*AILog.Info("Company name is set");
   AILog.Info("GetLoanAmount: " + AICompany.GetLoanAmount());
   AILog.Info("GetLoanInterval: " + AICompany.GetLoanInterval());
   AILog.Info("GetMaxLoanAmount: " + AICompany.GetMaxLoanAmount());
-  AILog.Info("GetMapSize: " + AIMap.GetMapSize());
+  AILog.Info("GetMapSize: " + AIMap.GetMapSize());*/
   local townCount = AITown.GetTownCount ();
   local mostPopulationTown = 0;
   local mostPopulation = 0;
@@ -31,17 +31,19 @@ function AstarAI::Start() {
   LogTile(location/*, mostPopulationTown*/, location);
   LogTile(location-1/*, mostPopulationTown*/, location);
   local cargo = AICargoList();
-  foreach (x,y in cargo) {
+  /*foreach (x,y in cargo) {
       AILog.Info(AICargo.GetName(x));
-  }
+  }*/
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
   local route = searchValuableRoadRoute();
   AILog.Info("route from: " + route.locationFrom);
   AILog.Info("route to: " + route.locationTo);
 
-  if (BuildStationInCityCenter(route.locationFrom)) {
-    if (BuildStationInCityCenter(route.locationTo)) {
+  route.locationFrom = BuildStationInCityCenter(route.locationFrom)
+  if (route.locationFrom != null) {
+    route.locationTo = BuildStationInCityCenter(route.locationTo);
+    if (route.locationTo != null) {
       AILog.Info("station built");
     } else {
       AILog.Info("station to can not built");
@@ -57,7 +59,7 @@ function AstarAI::Start() {
 }
 
 function AstarAI::BuildStationInCityCenter(location) {
-  return GetClosestRoad(location) != null;
+  return GetClosestRoad(location);
   /*local x = AIMap.GetTileX(stopLocation);
   local y = AIMap.GetTileY(stopLocation);
   if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x+1, y), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
@@ -165,6 +167,7 @@ function CanBuildDriveThroughRoadStation(location) {
 
 function SearchPossibleRoadBetweenLocations(f, t) {
   local road = [];
+  local visitedLocations = {};
   local from = Location.get(f);
   local to = Location.get(t);
   local currentLocation = from;
@@ -172,26 +175,58 @@ function SearchPossibleRoadBetweenLocations(f, t) {
   local nextLocation;
   AILog.Info(from);
   AILog.Info(to);
-  while (!currentLocation.equals(to)) {
+  local i = 0;
+  while (!currentLocation.equals(to) && i < 466) {
+    i++;
+    AILog.Info(i);
     nextLocation = currentLocation.getNextTo(to, directionX);
-    AILog.Info(nextLocation);
+    AILog.Info("next: " + nextLocation);
+    if (visitedLocations.rawin(nextLocation.id)) {
+      AILog.Info("already visited: " + nextLocation);
+      if (!directionX) {
+        local prevLocation = road.pop();
+        visitedLocations.rawset(prevLocation.id, prevLocation.id);
+        AILog.Info(prevLocation);
+        currentLocation = prevLocation;
+        directionX = true;
+      } else {
+        directionX = false;
+      }
+      continue;
+    }
     if (AIRoad.IsRoadTile(nextLocation.id)) {
       AILog.Info("is road");
       road.append(nextLocation);
-      directionX = true;
+      directionX = nextLocation.x != to.x;
+      AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
+      currentLocation = nextLocation;
     } else if (AITile.IsBuildable(nextLocation.id)) {
       AILog.Info("is buildable");
       road.append(nextLocation);
-      directionX = true;
+      directionX = nextLocation.x != to.x;
+      AIRoad.BuildRoad(currentLocation.id, nextLocation.id);
+      currentLocation = nextLocation;
+      this.Sleep(5);
     } else if (directionX) {
       directionX = false;
+      AILog.Info("direction changed");
     } else {
       AILog.Info("road can not build");
-      break;
+      local prevLocation = road.pop();
+      AILog.Info(prevLocation);
+      visitedLocations.rawset(prevLocation.id, prevLocation.id);
+      if (to.x == nextLocation.x) {
+        while (nextLocation.x == prevLocation.x) {
+          prevLocation = road.pop();
+          visitedLocations.rawset(prevLocation.id, prevLocation.id);
+          AILog.Info(prevLocation);
+        }
+      }
+      currentLocation = prevLocation;
     } 
-    break;
   }
 }
+
 
 /**
  * Searches a valuable route for buses. not too far not too close
@@ -220,7 +255,7 @@ function AstarAI::searchValuableRoadRoute() {
           maxProd = prodFrom + prodTo;
           fromTownIndex = townFrom.id;
           toTownIndex = townTo.id;
-          AILog.Info(maxProd);
+          //AILog.Info(maxProd);
         }
       }
     }

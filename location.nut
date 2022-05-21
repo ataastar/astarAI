@@ -34,7 +34,7 @@ function Location::equals(o) {
 }
 
 function Location::getNextTo(to, directionX) {
-    if (directionX) {
+    if (directionX && x != to.x) {
       if (x > to.x) {
         return Location.getXY(x-1, y);
       } else {
