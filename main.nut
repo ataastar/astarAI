@@ -2,10 +2,40 @@ require("town.nut");
 require("route.nut");
 require("location.nut");
 require("constants.nut");
+require("engine.nut");
 
 class AstarAI extends AIController {
 
     function Start();
+    
+    static buildDriveThroughRoadStation = 
+      function(stopLocation) {
+        //AILog.Info("BuildDriveThroughRoadStation-stopLocation: " + stopLocation);
+        foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
+          if (AIRoad.BuildDriveThroughRoadStation(stopLocation.id, neighbourLocation.id, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
+            return true;
+          }
+        }
+        AILog.Info("buildDriveThroughRoadStation was not success.");
+        return false;
+      }
+
+    static canBuildRoadDepot = 
+      function(stopLocation) {
+        AILog.Info("canBuildRoadDepo-stopLocation: " + stopLocation);
+        if (AITile.IsBuildable(stopLocation.id)) {
+        AILog.Info("buildable: " + stopLocation);
+          foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
+            if (AIRoad.IsRoadTile(neighbourLocation.id)) {
+              return true;
+            }
+          }
+          AILog.Info("canBuildRoadDepo was not success.");
+          return false;
+        }
+        return false;
+      }
+
 }
 
 function AstarAI::Start() {
@@ -29,15 +59,48 @@ function AstarAI::Start() {
   }*/
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
+  
+  makeRoute();
+  
+  while (true) {
+    AILog.Info("in loop.");
+    this.Sleep(1000);
+  }
+}
+
+function AstarAI::getEngineFor(cargo, from, to) {
+  local engineList = Engine.getList(AIVehicle.VT_ROAD, AIRoad.ROADTYPE_ROAD);
+  local isTruck = function(e) { return e.GetRoadType() == AIRoad.ROADTYPE_ROAD; };
+  local canTransport = function (e):(cargo) { return e.CanRefitCargo(cargo); }
+  local isNotArticulated = function(e) { return !e.IsArticulated(); }
+  engineList = filter( engineList, isTruck );
+  engineList = filter( engineList, canTransport );
+  // We can't handle articulated vehicles until we use
+  // passthrough stations instead of loading bays
+  engineList = makeArray(filter( engineList, isNotArticulated ));
+  if ( engineList.len() > 0 ) {
+    local engine;
+    foreach( e in engineList ) {
+        if (engine == null || engine.GetCapacity(cargo) < e.GetCapacity(cargo)) {
+          engine = e;
+        }
+    }
+    return engine;
+  } else {
+    return null;
+  }
+}
+
+function AstarAI::makeRoute() {
   local route = SearchValuableRoadRoute();
   AILog.Info("route from: " + route[0].id);
   AILog.Info("route to: " + route[1].id);
 
-  local locationFrom = getClosest(route[0])
+  local locationFrom = getClosest(route[0], AstarAI.buildDriveThroughRoadStation)
   local locationTo;
-  if (locationFrom != null && BuildDriveThroughRoadStation(locationFrom)) {
-    locationTo = getClosest(route[1]);
-    if (locationTo != null && BuildDriveThroughRoadStation(locationTo)) {
+  if (locationFrom != null && AstarAI.buildDriveThroughRoadStation(locationFrom)) {
+    locationTo = getClosest(route[1], AstarAI.buildDriveThroughRoadStation);
+    if (locationTo != null && AstarAI.buildDriveThroughRoadStation(locationTo)) {
       AILog.Info("station built");
     } else {
       AILog.Info("station to can not built");
@@ -55,10 +118,10 @@ function AstarAI::Start() {
       }
       prevRoad = road;
     }
-  }
-  while (true) {
-    AILog.Info("in loop.");
-    this.Sleep(1000);
+    local depoLocationFrom = getClosest(locationFrom, AstarAI.canBuildRoadDepot);
+    buildRoadDepot(depoLocationFrom);
+    local depoLocationTo = getClosest(locationTo, AstarAI.canBuildRoadDepot);
+    buildRoadDepot(depoLocationTo);
   }
 }
 
@@ -75,35 +138,35 @@ function AstarAI::GetMostPopulationTown() {
   return mostPopulationTown;
 }
 
-function AstarAI::getClosest(location) {
+function AstarAI::getClosest(location, condition) {
   local x = location.x;
   local y = location.y;
   local test = AITestMode();
-  local isRoadLocation = BuildDriveThroughRoadStation(Location.getXY(x, y));
+  local isRoadLocation = condition(Location.getXY(x, y));
   local i = 1;
   while (!isRoadLocation && i < 10) {
     for (local j=0; j < i; j++) {
       AILog.Info("start: " + i)
       x = location.x + i;
       y = location.y + j;
-      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
+      if (condition(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
       x = location.x - i;
       y = location.y - j;
-      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
+      if (condition(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
       x = location.x;
       y = location.y + j;
-      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
+      if (condition(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
       y = location.y - j;
-      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
+      if (condition(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
@@ -113,18 +176,6 @@ function AstarAI::getClosest(location) {
   }
   AILog.Info("road found in (x, y): " + x + "," + y);
   return isRoadLocation ? Location.getXY(x, y) : null;
-}
-
-function AstarAI::BuildDriveThroughRoadStation(stopLocation) {
-  AILog.Info("BuildDriveThroughRoadStation-stopLocation: " + stopLocation);
-  AILog.Info("BuildDriveThroughRoadStation-stopLocation.getNeighbourhood(): " + stopLocation.getNeighbourhood());
-  foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
-    if (AIRoad.BuildDriveThroughRoadStation(stopLocation.id, neighbourLocation.id, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-      return true;
-    }
-  }
-  AILog.Info("BuildStationInCityCenter was not success.");
-  return false;
 }
 
 /**
@@ -178,7 +229,7 @@ function SearchPossibleRoadBetweenLocations(from, to) {
       //AILog.Info(prevLocation);
       // we can not go forward, we go back to the previous x-1 location and sign al of the skipped location as "visited"
       visitedLocations.rawset(prevLocation.id, prevLocation.id);
-      while (nextLocation.x == prevLocation.x) {
+      while (nextLocation.x == prevLocation.x && road.len() > 0) {
         prevLocation = road.pop();
         if (nextLocation.x == prevLocation.x) {
           visitedLocations.rawset(prevLocation.id, prevLocation.id);
@@ -191,6 +242,18 @@ function SearchPossibleRoadBetweenLocations(from, to) {
     } 
   }
   return road;
+}
+
+function buildRoadDepot(stopLocation) {
+  AILog.Info("BuildRoadDepot-stopLocation: " + stopLocation);
+  foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
+    if (AIRoad.IsRoadTile(neighbourLocation.id) && AIRoad.BuildRoadDepot(stopLocation.id, neighbourLocation.id)) {
+      AIRoad.BuildRoad(stopLocation.id, neighbourLocation.id);
+      return true;
+    }
+  }
+  AILog.Info("BuildRoadDepot was not success.");
+  return false;
 }
 
 
