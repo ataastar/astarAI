@@ -1,6 +1,7 @@
 require("town.nut");
 require("route.nut");
 require("location.nut");
+require("constants.nut");
 
 class AstarAI extends AIController {
 
@@ -17,7 +18,51 @@ function AstarAI::Start() {
   AILog.Info("GetLoanInterval: " + AICompany.GetLoanInterval());
   AILog.Info("GetMaxLoanAmount: " + AICompany.GetMaxLoanAmount());
   AILog.Info("GetMapSize: " + AIMap.GetMapSize());*/
-  local townCount = AITown.GetTownCount ();
+  /*local townCount = AITown.GetTownCount ();
+  local mostPopulationTown = GetMostPopulationTown();
+  local location = AITown.GetLocation (mostPopulationTown);*/
+  //LogTile(location/*, mostPopulationTown*/, location);
+  //LogTile(location-1/*, mostPopulationTown*/, location);
+  //local cargo = AICargoList();
+  /*foreach (x,y in cargo) {
+      AILog.Info(AICargo.GetName(x));
+  }*/
+  //LogTileNeigbourhood(location, mostPopulationTown);
+  //SearchBuildable(location);
+  local route = SearchValuableRoadRoute();
+  AILog.Info("route from: " + route[0].id);
+  AILog.Info("route to: " + route[1].id);
+
+  local locationFrom = getClosest(route[0])
+  local locationTo;
+  if (locationFrom != null && BuildDriveThroughRoadStation(locationFrom)) {
+    locationTo = getClosest(route[1]);
+    if (locationTo != null && BuildDriveThroughRoadStation(locationTo)) {
+      AILog.Info("station built");
+    } else {
+      AILog.Info("station to can not built");
+    }    
+  } else {
+    AILog.Info("station from can not built");
+  }
+  if (locationFrom != null && locationTo != null) {
+    local roads = SearchPossibleRoadBetweenLocations(locationFrom, locationTo);
+    local prevRoad = null;
+    foreach (road in roads) {
+      if (prevRoad != null) {
+        AILog.Info(prevRoad);
+        AIRoad.BuildRoad(prevRoad.id, road.id);
+      }
+      prevRoad = road;
+    }
+  }
+  while (true) {
+    AILog.Info("in loop.");
+    this.Sleep(1000);
+  }
+}
+
+function AstarAI::GetMostPopulationTown() {
   local mostPopulationTown = 0;
   local mostPopulation = 0;
   for (local i =0; i < townCount; i++) {
@@ -27,99 +72,38 @@ function AstarAI::Start() {
     }
   }
   AILog.Info(AITown.GetName(mostPopulationTown) + ": " + mostPopulation + "prod pass: " + AITown.GetLastMonthProduction(mostPopulationTown, 0));
-  local location = AITown.GetLocation (mostPopulationTown);
-  LogTile(location/*, mostPopulationTown*/, location);
-  LogTile(location-1/*, mostPopulationTown*/, location);
-  local cargo = AICargoList();
-  /*foreach (x,y in cargo) {
-      AILog.Info(AICargo.GetName(x));
-  }*/
-  //LogTileNeigbourhood(location, mostPopulationTown);
-  //SearchBuildable(location);
-  local route = SearchValuableRoadRoute();
-  AILog.Info("route from: " + route.locationFrom);
-  AILog.Info("route to: " + route.locationTo);
-
-  route.locationFrom = BuildStationInCityCenter(route.locationFrom)
-  if (route.locationFrom != null) {
-    route.locationTo = BuildStationInCityCenter(route.locationTo);
-    if (route.locationTo != null) {
-      AILog.Info("station built");
-    } else {
-      AILog.Info("station to can not built");
-    }    
-  } else {
-    AILog.Info("station from can not built");
-  }
-  local roads = SearchPossibleRoadBetweenLocations(route.locationFrom, route.locationTo);
-  local prevRoad = null;
-  foreach (road in roads) {
-    if (prevRoad != null) {
-      AILog.Info(prevRoad);
-      AIRoad.BuildRoad(prevRoad.id, road.id);
-    }
-    prevRoad = road;
-  }
-  while (true) {
-    AILog.Info("in loop.");
-    this.Sleep(1000);
-  }
+  return mostPopulationTown;
 }
 
-function AstarAI::BuildStationInCityCenter(location) {
-  return GetClosestRoad(location);
-  /*local x = AIMap.GetTileX(stopLocation);
-  local y = AIMap.GetTileY(stopLocation);
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x+1, y), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  AILog.Info("BuildStationInCityCenter 2.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x-1, y), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  AILog.Info("BuildStationInCityCenter 3.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x, y-1), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  AILog.Info("BuildStationInCityCenter 4.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x, y-1), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  AILog.Info("BuildStationInCityCenter was not success.");*/
-  //return false;
-}
-
-function AstarAI::GetClosestRoad(location) {
-  local stopLocation = location;
-  local xIndex = AIMap.GetTileX(location);
-  local yIndex = AIMap.GetTileY(location);
-  local x = xIndex;
-  local y = yIndex;
-  local isRoadLocation = CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(xIndex, yIndex)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y));
+function AstarAI::getClosest(location) {
+  local x = location.x;
+  local y = location.y;
+  local test = AITestMode();
+  local isRoadLocation = BuildDriveThroughRoadStation(Location.getXY(x, y));
   local i = 1;
   while (!isRoadLocation && i < 10) {
     for (local j=0; j < i; j++) {
       AILog.Info("start: " + i)
-      x = xIndex + i;
-      y = yIndex + j;
-      if (CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y))) {
+      x = location.x + i;
+      y = location.y + j;
+      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
-      x = xIndex - i;
-      y = yIndex - j;
-      if (CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y))) {
+      x = location.x - i;
+      y = location.y - j;
+      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
-      x = xIndex;
-      y = yIndex + j;
-      if (CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y))) {
+      x = location.x;
+      y = location.y + j;
+      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
-      y = yIndex - j;
-      if (CanBuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y)) && BuildDriveThroughRoadStation(AIMap.GetTileIndex(x, y))) {
+      y = location.y - j;
+      if (BuildDriveThroughRoadStation(Location.getXY(x, y))) {
         isRoadLocation = true;
         break;
       }
@@ -128,68 +112,34 @@ function AstarAI::GetClosestRoad(location) {
     i++;
   }
   AILog.Info("road found in (x, y): " + x + "," + y);
-  return isRoadLocation ? AIMap.GetTileIndex(x, y) : null;
+  return isRoadLocation ? Location.getXY(x, y) : null;
 }
 
 function AstarAI::BuildDriveThroughRoadStation(stopLocation) {
-  local x = AIMap.GetTileX(stopLocation);
-  local y = AIMap.GetTileY(stopLocation);
-  AILog.Info("try to build " + stopLocation + " (" + x + "," + y + ")");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x+1, y), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  //AILog.Info("BuildStationInCityCenter 2.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x-1, y), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  //AILog.Info("BuildStationInCityCenter 3.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x, y-1), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
-  }
-  //AILog.Info("BuildStationInCityCenter 4.");
-  if (AIRoad.BuildDriveThroughRoadStation(stopLocation, AIMap.GetTileIndex(x, y-1), AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
-    return true;
+  AILog.Info("BuildDriveThroughRoadStation-stopLocation: " + stopLocation);
+  AILog.Info("BuildDriveThroughRoadStation-stopLocation.getNeighbourhood(): " + stopLocation.getNeighbourhood());
+  foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
+    if (AIRoad.BuildDriveThroughRoadStation(stopLocation.id, neighbourLocation.id, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW)) {
+      return true;
+    }
   }
   AILog.Info("BuildStationInCityCenter was not success.");
-  return false;
-}
-
-function CanBuildDriveThroughRoadStation(location) {
-  local x = AIMap.GetTileX(location);
-  local y = AIMap.GetTileY(location);
-  //AILog.Info("location is road: " + AIRoad.IsRoadTile(location));
-  local x_ = AIRoad.IsRoadTile(AIMap.GetTileIndex(x+1, y));
-  local _x = AIRoad.IsRoadTile(AIMap.GetTileIndex(x-1, y));
-  local y_ = AIRoad.IsRoadTile(AIMap.GetTileIndex(x, y+1));
-  local _y = AIRoad.IsRoadTile(AIMap.GetTileIndex(x, y-1));
-  if (AIRoad.IsRoadTile(location)) {
-    return x_ && _x && !y_ && !_y 
-      || !x_ && !_x && y_ && _y;
-  }
-  if (AITile.PlantTree(location)) {
-    AILog.Info("Tree is built!!! " + location + " (" + x + "," + y + ")");
-    this.Sleep(100);
-  }
   return false;
 }
 
 /**
  * Start go in X direction always. Can not bypass anything. So not sure it can find possible road
  */
-function SearchPossibleRoadBetweenLocations(f, t) {
+function SearchPossibleRoadBetweenLocations(from, to) {
   local road = [];
   local visitedLocations = {};
-  local from = Location.get(f);
-  local to = Location.get(t);
   local currentLocation = from;
   local directionX = true;
   local nextLocation;
   AILog.Info(from);
   AILog.Info(to);
-  local i = 0;
-  while (!currentLocation.equals(to) && i < 1000) {
-    i++;
-    //AILog.Info(i);
+  road.append(currentLocation);
+  while (!currentLocation.equals(to) && road.len() > 0) {
     // get the next location by direction to the destination
     nextLocation = currentLocation.getNextTo(to, directionX);
     //AILog.Info("next: " + nextLocation);
@@ -265,7 +215,7 @@ function AstarAI::SearchValuableRoadRoute() {
       local locationTo = AITown.GetLocation(townTo.id);
       local distance = AIMap.DistanceManhattan(locationFrom, locationTo)
       if (distance > 50 && distance < 70) {
-        local prodFrom = AITown.GetLastMonthProduction(townFrom.id, 0);
+        local prodFrom = AITown.GetLastMonthProduction(townFrom.id, 0); // TODO 0
         local prodTo = AITown.GetLastMonthProduction(townTo.id, 0);
         if (maxProd < prodFrom + prodTo) {
           maxProd = prodFrom + prodTo;
@@ -278,8 +228,8 @@ function AstarAI::SearchValuableRoadRoute() {
   }
   LogTown(fromTownIndex);
   LogTown(toTownIndex);
-  AILog.Info(maxProd);
-  return Route(AITown.GetLocation(fromTownIndex), AITown.GetLocation(toTownIndex));
+  //AILog.Info(maxProd);
+  return [Location.get(AITown.GetLocation(fromTownIndex)), Location.get(AITown.GetLocation(toTownIndex))];
 }
 
 function AstarAI::getTowns() {
@@ -305,8 +255,8 @@ function AstarAI::LogTileNeigbourhood(location/*, townId*/) {
 }
 
 function AstarAI::LogTown(townIndex) {
-  local location = AITown.GetLocation(townIndex);
-  AILog.Info("Name: " + AITown.GetName(townIndex) + ", location: " + location + "(" + AIMap.GetTileX(location) + ", " + AIMap.GetTileY(location) + ")");
+  local location = Location.get(AITown.GetLocation(townIndex));
+  AILog.Info("Name: " + AITown.GetName(townIndex) + ", location: " + location);
 }
 
 function AstarAI::LogTile(location/* townId*/, townLocation) {
@@ -355,6 +305,17 @@ function AstarAI::ChooseCompanyName() {
     }
   }
 }
+
+/*function AstarAI::EstimateDays(tileFrom, tileTo, cargo) {
+  local distance = EstimateDistance(tileFrom, tileTo );
+  local distanceInKm = distance * KMISH_PER_TILE;
+  local engine = GetEngineFor(cargo, null, null);
+  if(!engine)
+      return;
+  local speed = engine.GetMaxSpeed();
+  local travelTimeInDays = distanceInKm  / speed / 24;
+  return travelTimeInDays + 2*ROAD_DAYS_AT_STATION; // add a few days for load/unload TODO
+}*/
 
 /**
  * The function called when stopping the AI.
