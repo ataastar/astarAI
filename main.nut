@@ -7,8 +7,8 @@ require("engine.nut");
 class AstarAI extends AIController {
 
     function Start();
-    
-    static buildDriveThroughRoadStation = 
+
+    static buildDriveThroughRoadStation =
       function(stopLocation) {
         //AILog.Info("BuildDriveThroughRoadStation-stopLocation: " + stopLocation);
         foreach (neighbourLocation in stopLocation.getNeighbourhood()) {
@@ -20,7 +20,7 @@ class AstarAI extends AIController {
         return false;
       }
 
-    static canBuildRoadDepot = 
+    static canBuildRoadDepot =
       function(stopLocation) {
         AILog.Info("canBuildRoadDepo-stopLocation: " + stopLocation);
         if (AITile.IsBuildable(stopLocation.id)) {
@@ -59,9 +59,10 @@ function AstarAI::Start() {
   }*/
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
-  
+
   makeRoute();
-  
+
+
   while (true) {
     AILog.Info("in loop.");
     this.Sleep(1000);
@@ -96,6 +97,8 @@ function AstarAI::makeRoute() {
   AILog.Info("route from: " + route[0].id);
   AILog.Info("route to: " + route[1].id);
 
+
+
   local locationFrom = getClosest(route[0], AstarAI.buildDriveThroughRoadStation)
   local locationTo;
   if (locationFrom != null && AstarAI.buildDriveThroughRoadStation(locationFrom)) {
@@ -104,7 +107,7 @@ function AstarAI::makeRoute() {
       AILog.Info("station built");
     } else {
       AILog.Info("station to can not built");
-    }    
+    }
   } else {
     AILog.Info("station from can not built");
   }
@@ -239,7 +242,7 @@ function SearchPossibleRoadBetweenLocations(from, to) {
         //AILog.Info(prevLocation);
       }
       currentLocation = prevLocation;
-    } 
+    }
   }
   return road;
 }
@@ -263,7 +266,7 @@ function buildRoadDepot(stopLocation) {
 function AstarAI::SearchValuableRoadRoute() {
   local townList = getTowns();
   /*townList.sort(
-    function(a,b) { 
+    function(a,b) {
       if (a.population == b.population) return 0;
       if (a.population > b.population) return -1;
       return 1;
@@ -343,23 +346,6 @@ function AstarAI::LogTile(location/* townId*/, townLocation) {
     + "DistanceSquare: " + AIMap.DistanceSquare(location, townLocation));
 }
 
-
-
-function AstarAI::SearchBuildable(location) {
-  AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
-  local buildable = AITile.IsBuildable(location);
-  AILog.Info(buildable);
-  local isRoad = AIRoad.IsRoadTile(location);
-  AILog.Info("isRoad: " + isRoad);
-  if (isRoad) {
-  AILog.Info("location - 1 is road: " + AIRoad.IsRoadTile(location-1));
-  /*local stationResult = AIRoad.BuildDriveThroughRoadStation(location, location - 1, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW);
-  AILog.Info("stationResult: " + stationResult);
-  local stationResult2 = AIRoad.BuildDriveThroughRoadStation(location-1, location - 2, AIRoad.ROADVEHTYPE_BUS, AIStation.STATION_NEW);
-  AILog.Info("stationResult: " + stationResult2);*/
-  }
-}
-
 function AstarAI::ChooseCompanyName() {
   if (!AICompany.SetName("AstarAI")) {
     local i = 2;
@@ -383,12 +369,10 @@ function AstarAI::ChooseCompanyName() {
 /**
  * The function called when stopping the AI.
  */
-function AstarAI::Stop() {
-}
+function AstarAI::Stop() {}
 
 function AstarAI::Save() {
   local table = {};
   return table;
 }
-function AstarAI::Load(version,data) {
-}
+function AstarAI::Load(version,data) {}
