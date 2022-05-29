@@ -1,7 +1,9 @@
 class Route {
-  locationFrom = null;
-  locationTo = null;
-  
+  stationFrom = null;
+  stationTo = null;
+  depotFrom = null;
+  depotTo = null;
+
   constructor(locationFrom, locationTo) {
     this.locationFrom = locationFrom;
     this.locationTo = locationTo;

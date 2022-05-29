@@ -53,9 +53,9 @@ function AstarAI::Start() {
   local location = AITown.GetLocation (mostPopulationTown);*/
   //LogTile(location/*, mostPopulationTown*/, location);
   //LogTile(location-1/*, mostPopulationTown*/, location);
-  //local cargo = AICargoList();
-  /*foreach (x,y in cargo) {
-      AILog.Info(AICargo.GetName(x));
+  /*local cargo = AICargoList();
+  foreach (x,y in cargo) {
+      AILog.Info(AICargo.GetName(x) + ": " + x);
   }*/
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
@@ -69,22 +69,23 @@ function AstarAI::Start() {
   }
 }
 
-function AstarAI::getEngineFor(cargo, from, to) {
+function AstarAI::getEngineFor(cargo) {
   local engineList = Engine.getList(AIVehicle.VT_ROAD, AIRoad.ROADTYPE_ROAD);
   local isTruck = function(e) { return e.GetRoadType() == AIRoad.ROADTYPE_ROAD; };
   local canTransport = function (e):(cargo) { return e.CanRefitCargo(cargo); }
-  local isNotArticulated = function(e) { return !e.IsArticulated(); }
+  //local isNotArticulated = function(e) { return !e.IsArticulated(); }
   engineList = filter( engineList, isTruck );
   engineList = filter( engineList, canTransport );
   // We can't handle articulated vehicles until we use
   // passthrough stations instead of loading bays
-  engineList = makeArray(filter( engineList, isNotArticulated ));
+  //engineList = makeArray(filter( engineList, isNotArticulated ));
+  engineList = makeArray(engineList);
   if ( engineList.len() > 0 ) {
     local engine;
     foreach( e in engineList ) {
-        if (engine == null || engine.GetCapacity(cargo) < e.GetCapacity(cargo)) {
-          engine = e;
-        }
+      if (engine == null || engine.GetCapacity(cargo) < e.GetCapacity(cargo)) {
+        engine = e;
+      }
     }
     return engine;
   } else {
@@ -100,31 +101,60 @@ function AstarAI::makeRoute() {
 
 
   local locationFrom = getClosest(route[0], AstarAI.buildDriveThroughRoadStation)
-  local locationTo;
-  if (locationFrom != null && AstarAI.buildDriveThroughRoadStation(locationFrom)) {
-    locationTo = getClosest(route[1], AstarAI.buildDriveThroughRoadStation);
-    if (locationTo != null && AstarAI.buildDriveThroughRoadStation(locationTo)) {
-      AILog.Info("station built");
-    } else {
-      AILog.Info("station to can not built");
-    }
-  } else {
-    AILog.Info("station from can not built");
+  if (locationFrom == null) {
+    AILog.Error("Cannot find location from! " + AIError.GetLastError());
+    return;
   }
-  if (locationFrom != null && locationTo != null) {
-    local roads = SearchPossibleRoadBetweenLocations(locationFrom, locationTo);
-    local prevRoad = null;
-    foreach (road in roads) {
-      if (prevRoad != null) {
-        AILog.Info(prevRoad);
-        AIRoad.BuildRoad(prevRoad.id, road.id);
-      }
-      prevRoad = road;
+  local locationTo;
+  if (!AstarAI.buildDriveThroughRoadStation(locationFrom)) {
+    AILog.Error("Cannot build station from! " + AIError.GetLastError());
+    return;
+  }
+  locationTo = getClosest(route[1], AstarAI.buildDriveThroughRoadStation);
+  if (locationTo == null) {
+    AILog.Error("Cannot find location to! " + AIError.GetLastError());
+    return;
+  }
+  if (!AstarAI.buildDriveThroughRoadStation(locationTo)) {
+    AILog.Error("Cannot build station to! " + AIError.GetLastError());
+    return;
+  }
+  local roadLocations = SearchPossibleRoadBetweenLocations(locationFrom, locationTo);
+  buildRoad(roadLocations);
+  local depoLocationFrom = getClosest(locationFrom, AstarAI.canBuildRoadDepot);
+  if (!buildRoadDepot(depoLocationFrom)) {
+    AILog.Error("Cannot build depot from! " + AIError.GetLastError());
+    return;
+  }
+  local depoLocationTo = getClosest(locationTo, AstarAI.canBuildRoadDepot);
+  if (!buildRoadDepot(depoLocationTo)) {
+    AILog.Error("Cannot build depot to! " + AIError.GetLastError());
+    return;
+  }
+
+  local vehicle = getEngineFor(0);
+
+  local flags = AIOrder.OF_NON_STOP_INTERMEDIATE | AIOrder.OF_FULL_LOAD_ANY;
+
+  local vehicleFrom = AIVehicle.BuildVehicle(depoLocationFrom.id, vehicle._id);
+  AIOrder.AppendOrder(vehicleFrom, locationFrom.id, flags);
+  AIOrder.AppendOrder(vehicleFrom, locationTo.id, flags);
+  AIVehicle.StartStopVehicle(vehicleFrom);
+
+  local vehicleTo = AIVehicle.BuildVehicle(depoLocationTo.id, vehicle._id);
+  AIOrder.AppendOrder(vehicleTo, locationTo.id, flags);
+  AIOrder.AppendOrder(vehicleTo, locationFrom.id, flags);
+  AIVehicle.StartStopVehicle(vehicleTo);
+}
+
+function buildRoad(roadLocations) {
+  local prevRoad = null;
+  foreach (road in roadLocations) {
+    if (prevRoad != null) {
+      AILog.Info(prevRoad);
+      AIRoad.BuildRoad(prevRoad.id, road.id);
     }
-    local depoLocationFrom = getClosest(locationFrom, AstarAI.canBuildRoadDepot);
-    buildRoadDepot(depoLocationFrom);
-    local depoLocationTo = getClosest(locationTo, AstarAI.canBuildRoadDepot);
-    buildRoadDepot(depoLocationTo);
+    prevRoad = road;
   }
 }
 
@@ -354,6 +384,25 @@ function AstarAI::ChooseCompanyName() {
     }
   }
 }
+
+function makeArray(seq) {
+  local result = [];
+  foreach(x in seq) {
+    result.push(x);
+  }
+  return result;
+}
+
+function filter(list, fun) {
+  local result = [];
+  foreach( value in list ) {
+    if (fun(value)) {
+      result.append(value);
+    }
+  }
+  return result;
+}
+
 
 /*function AstarAI::EstimateDays(tileFrom, tileTo, cargo) {
   local distance = EstimateDistance(tileFrom, tileTo );
