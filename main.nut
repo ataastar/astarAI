@@ -132,16 +132,20 @@ function AstarAI::makeRoute() {
     return;
   }
 
-  local vehicle = getEngineFor(0);
+  local engine = getEngineFor(0);
+
+  local travelInDays = estimateDays(locationFrom, locationTo, engine);
+  AILog.Info("distance: " + roadLocations.len());
+  AILog.Info("Travel in days: " + travelInDays);
 
   local flags = AIOrder.OF_NON_STOP_INTERMEDIATE | AIOrder.OF_FULL_LOAD_ANY;
 
-  local vehicleFrom = AIVehicle.BuildVehicle(depoLocationFrom.id, vehicle._id);
+  local vehicleFrom = AIVehicle.BuildVehicle(depoLocationFrom.id, engine._id);
   AIOrder.AppendOrder(vehicleFrom, locationFrom.id, flags);
   AIOrder.AppendOrder(vehicleFrom, locationTo.id, flags);
   AIVehicle.StartStopVehicle(vehicleFrom);
 
-  local vehicleTo = AIVehicle.BuildVehicle(depoLocationTo.id, vehicle._id);
+  local vehicleTo = AIVehicle.BuildVehicle(depoLocationTo.id, engine._id);
   AIOrder.AppendOrder(vehicleTo, locationTo.id, flags);
   AIOrder.AppendOrder(vehicleTo, locationFrom.id, flags);
   AIVehicle.StartStopVehicle(vehicleTo);
@@ -404,13 +408,13 @@ function filter(list, fun) {
 }
 
 
-function AstarAI::EstimateDays(tileFrom, tileTo, cargo) {
-  local distance = AITile.GetDistanceManhattanToTile(fromTile,toTile);
+function AstarAI::estimateDays(tileFrom, tileTo, engine) {
+  local distance = AITile.GetDistanceManhattanToTile(tileFrom.id, tileTo.id);
   local distanceInKm = distance * KMISH_PER_TILE;
-  local engine = GetEngineFor(cargo, null, null);
+  /*local engine = GetEngineFor(cargo, null, null);
   if(!engine) {
     return;
-  }
+  }*/
   local speed = engine.GetMaxSpeed();
   local travelTimeInDays = distanceInKm  / speed / 24;
   return travelTimeInDays + 2*ROAD_DAYS_AT_STATION; // add a few days for load/unload TODO
