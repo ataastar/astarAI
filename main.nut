@@ -404,16 +404,17 @@ function filter(list, fun) {
 }
 
 
-/*function AstarAI::EstimateDays(tileFrom, tileTo, cargo) {
-  local distance = EstimateDistance(tileFrom, tileTo );
+function AstarAI::EstimateDays(tileFrom, tileTo, cargo) {
+  local distance = AITile.GetDistanceManhattanToTile(fromTile,toTile);
   local distanceInKm = distance * KMISH_PER_TILE;
   local engine = GetEngineFor(cargo, null, null);
-  if(!engine)
-      return;
+  if(!engine) {
+    return;
+  }
   local speed = engine.GetMaxSpeed();
   local travelTimeInDays = distanceInKm  / speed / 24;
   return travelTimeInDays + 2*ROAD_DAYS_AT_STATION; // add a few days for load/unload TODO
-}*/
+}
 
 /**
  * The function called when stopping the AI.

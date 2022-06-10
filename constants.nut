@@ -1,4 +1,4 @@
-KMISH_PER_TILE <- 700;
+KMISH_PER_TILE <- 664;
 DIRECTIONS <- [AIMap.GetTileIndex(-1,0), AIMap.GetTileIndex(1,0), AIMap.GetTileIndex(0,1), AIMap.GetTileIndex(0,-1)];
 
 ROAD_DAYS_AT_STATION <- 4;
