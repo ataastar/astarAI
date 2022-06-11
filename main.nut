@@ -60,12 +60,13 @@ function AstarAI::Start() {
   //LogTileNeigbourhood(location, mostPopulationTown);
   //SearchBuildable(location);
 
-  makeRoute();
+  local route = makeRoute();
 
 
   while (true) {
     AILog.Info("in loop.");
-    this.Sleep(1000);
+    this.Sleep(50);
+    logProd(route);
   }
 }
 
@@ -119,6 +120,10 @@ function AstarAI::makeRoute() {
     AILog.Error("Cannot build station to! " + AIError.GetLastError());
     return;
   }
+
+  //local radius = AIStation.GetCoverageRadius(AIStation.STATION_BUS_STOP);
+  //logProd(locationFrom, locationTo);
+
   local roadLocations = SearchPossibleRoadBetweenLocations(locationFrom, locationTo);
   buildRoad(roadLocations);
   local depoLocationFrom = getClosest(locationFrom, AstarAI.canBuildRoadDepot);
@@ -149,6 +154,21 @@ function AstarAI::makeRoute() {
   AIOrder.AppendOrder(vehicleTo, locationTo.id, flags);
   AIOrder.AppendOrder(vehicleTo, locationFrom.id, flags);
   AIVehicle.StartStopVehicle(vehicleTo);
+
+  AILog.Info("locationFrom: " + locationFrom);
+  return Route(locationFrom, locationTo, depoLocationFrom, depoLocationTo);
+}
+
+function logProd(route) {
+  AILog.Info("route.stationFrom: " + route.stationFrom);
+  AILog.Info("stationFrom id: " + AIStation.GetStationID(route.stationFrom.id));
+  AILog.Info("valid station id: " + AIStation.IsValidStation(AIStation.GetStationID(route.stationFrom.id)));
+  local prodFrom = AIStation.GetCargoPlanned(AIStation.GetStationID(route.stationFrom.id), 0);
+  AILog.Info("prodFrom: " + prodFrom);
+  local prodTo = AIStation.GetCargoPlanned(AIStation.GetStationID(route.stationTo.id), 0);
+  AILog.Info("prodTo: " + prodTo);
+  AILog.Info("watiting from: " + AIStation.GetCargoWaiting(AIStation.GetStationID(route.stationFrom.id), 0));
+  AILog.Info("watiting to: " + AIStation.GetCargoWaiting(AIStation.GetStationID(route.stationTo.id), 0));
 }
 
 function buildRoad(roadLocations) {
